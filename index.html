@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ID TipsHub</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <h1>ID TipsHub</h1>
+    <h2>Share Your Tip</h2>
+
+    <form id="tip-form">
+      <input type="text" id="author" placeholder="Your Name" required />
+      <textarea
+        id="content"
+        placeholder="Share your instructional design tip..."
+        required
+      ></textarea>
+      <button type="submit">Submit Tip</button>
+    </form>
+
+    <h2>Community Tips</h2>
+    <div id="tips-container"></div>
+
+    <script type="module">
+      // Import the functions you need from the SDKs
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        addDoc,
+        getDocs,
+        serverTimestamp,
+        orderBy,
+        query,
+      } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyANYoQSKphY_XAnilkdY-5R61iCC-aYukQ",
+        authDomain: "id-tipshub.firebaseapp.com",
+        projectId: "id-tipshub",
+        storageBucket: "id-tipshub.appspot.com", // Corrected storage bucket URL
+        messagingSenderId: "386076617554",
+        appId: "1:386076617554:web:d5051dcbb01fb89446e88b",
+        measurementId: "G-3TLPW3QLBM",
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const form = document.getElementById("tip-form");
+      const tipsContainer = document.getElementById("tips-container");
+
+      // Submit a new tip
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const author = document.getElementById("author").value;
+        const content = document.getElementById("content").value;
+
+        try {
+          await addDoc(collection(db, "tips"), {
+            author,
+            content,
+            timestamp: serverTimestamp(),
+          });
+          form.reset();
+          loadTips();
+        } catch (error) {
+          console.error("Error adding tip: ", error);
+        }
+      });
+
+      // Load and display tips
+      async function loadTips() {
+        tipsContainer.innerHTML = "";
+        const q = query(collection(db, "tips"), orderBy("timestamp", "desc"));
+        const snapshot = await getDocs(q);
+        snapshot.forEach((doc) => {
+          const tip = doc.data();
+          tipsContainer.innerHTML += `
+            <div class="tip">
+              <strong>${tip.author}</strong>
+              <p>${tip.content}</p>
+              <small>${
+                tip.timestamp ? tip.timestamp.toDate().toLocaleString() : ""
+              }</small>
+            </div>
+            <hr />
+          `;
+        });
+      }
+
+      // Load tips on page load
+      loadTips();
+    </script>
+  </body>
+</html>

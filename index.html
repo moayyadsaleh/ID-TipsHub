@@ -3,199 +3,217 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Messaging & Chalkboard</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <h1>Messaging & Chalkboard</h1>
-
-    <!-- Messaging Section -->
-    <h2>Send a Message</h2>
-    <form id="message-form">
-      <input type="text" id="username" placeholder="Your Name" required />
-      <textarea
-        id="message"
-        placeholder="Type your message here..."
-        required
-      ></textarea>
-      <button type="submit">Send Message</button>
-    </form>
-
-    <h2>Chat Messages</h2>
-    <div id="messages-container"></div>
-
-    <!-- Chalkboard Section -->
-    <h2>Chalkboard</h2>
-    <canvas id="chalkboard" width="500" height="300"></canvas>
-    <button id="clear-chalkboard">Clear Chalkboard</button>
-
+    <title>Real-Time Collaboration App</title>
     <script type="module">
-      // Import the functions you need from the SDKs
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+      // Import necessary Firebase modules
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js";
       import {
-        getFirestore,
-        collection,
-        addDoc,
-        getDocs,
-        serverTimestamp,
-        orderBy,
-        query,
-      } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
-
-      // Your web app's Firebase configuration
-      const firebaseConfig = {
-        apiKey: "AIzaSyANYoQSKphY_XAnilkdY-5R61iCC-aYukQ",
-        authDomain: "id-tipshub.firebaseapp.com",
-        projectId: "id-tipshub",
-        storageBucket: "id-tipshub.appspot.com",
-        messagingSenderId: "386076617554",
-        appId: "1:386076617554:web:d5051dcbb01fb89446e88b",
-        measurementId: "G-3TLPW3QLBM",
-      };
-
-      // Initialize Firebase
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-
-      const form = document.getElementById("message-form");
-      const messagesContainer = document.getElementById("messages-container");
-
-      // Handle message submission
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const username = document.getElementById("username").value;
-        const message = document.getElementById("message").value;
-
-        try {
-          await addDoc(collection(db, "messages"), {
-            username,
-            message,
-            timestamp: serverTimestamp(),
-          });
-          form.reset();
-          loadMessages();
-        } catch (error) {
-          console.error("Error sending message: ", error);
-        }
-      });
-
-      // Load and display messages
-      async function loadMessages() {
-        messagesContainer.innerHTML = "";
-        const q = query(
-          collection(db, "messages"),
-          orderBy("timestamp", "desc")
-        );
-        const snapshot = await getDocs(q);
-        snapshot.forEach((doc) => {
-          const msg = doc.data();
-          messagesContainer.innerHTML += `
-            <div class="message">
-              <strong>${msg.username}</strong>
-              <p>${msg.message}</p>
-              <small>${
-                msg.timestamp ? msg.timestamp.toDate().toLocaleString() : ""
-              }</small>
-            </div>
-            <hr />
-          `;
-        });
-      }
-
-      // Load messages on page load
-      loadMessages();
-    </script>
-    <script type="module">
-      // Import Firebase SDK
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-      import {
-        getFirestore,
-        collection,
-        addDoc,
-        onSnapshot,
-        doc,
-        setDoc,
-      } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        getDatabase,
+        ref,
+        set,
+        onValue,
+        push,
+        remove,
+      } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
       // Firebase configuration
       const firebaseConfig = {
-        apiKey: "AIzaSyANYoQSKphY_XAnilkdY-5R61iCC-aYukQ",
-        authDomain: "id-tipshub.firebaseapp.com",
-        projectId: "id-tipshub",
-        storageBucket: "id-tipshub.appspot.com",
-        messagingSenderId: "386076617554",
-        appId: "1:386076617554:web:d5051dcbb01fb89446e88b",
-        measurementId: "G-3TLPW3QLBM",
+        apiKey: "AIzaSyDNwApaLmfjk1cZBA0kZZMkYEnr39VZUyg",
+        authDomain: "realtimecollabapp.firebaseapp.com",
+        databaseURL: "https://realtimecollabapp-default-rtdb.firebaseio.com",
+        projectId: "realtimecollabapp",
+        storageBucket: "realtimecollabapp.firebasestorage.app",
+        messagingSenderId: "955627884879",
+        appId: "1:955627884879:web:4f5159d814956ed1ce753a",
+        measurementId: "G-9311P887T1",
       };
 
       // Initialize Firebase
       const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
+      const db = getDatabase(app);
 
-      // Real-time drawing synchronization
-      let drawingRef = doc(db, "chalkboard", "drawing");
+      // DOM Elements
+      const contentArea = document.getElementById("content-area");
+      const messagesList = document.getElementById("messages");
+      const toolbar = document.getElementById("toolbar");
 
-      // Function to send drawing data to Firestore
-      const sendDrawingData = (data) => {
-        setDoc(drawingRef, { data: data });
-      };
-
-      // Listening for real-time updates from Firestore
-      onSnapshot(drawingRef, (docSnapshot) => {
-        const drawingData = docSnapshot.data().data;
-        drawRealTime(drawingData);
+      // Sync content area and cursor position in real-time
+      contentArea.addEventListener("input", () => {
+        const content = contentArea.innerHTML;
+        const selection = window.getSelection();
+        const cursorPosition = selection.focusOffset;
+        set(ref(db, "content"), { content, cursorPosition });
       });
 
-      // Drawing Canvas setup
-      const canvas = document.getElementById("chalkboard");
-      const ctx = canvas.getContext("2d");
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "white";
-
-      let isDrawing = false;
-
-      // Event listeners for drawing
-      canvas.addEventListener("mousedown", (e) => {
-        isDrawing = true;
-        ctx.moveTo(e.offsetX, e.offsetY);
-        sendDrawingData({ x: e.offsetX, y: e.offsetY, action: "start" });
-      });
-
-      canvas.addEventListener("mousemove", (e) => {
-        if (isDrawing) {
-          ctx.lineTo(e.offsetX, e.offsetY);
-          ctx.stroke();
-          sendDrawingData({ x: e.offsetX, y: e.offsetY, action: "draw" });
+      onValue(ref(db, "content"), (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+          if (data.content !== contentArea.innerHTML) {
+            contentArea.innerHTML = data.content;
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.setStart(
+              contentArea.firstChild || contentArea,
+              data.cursorPosition || 0
+            );
+            range.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(range);
+          }
         }
       });
 
-      canvas.addEventListener("mouseup", () => {
-        isDrawing = false;
-        sendDrawingData({ action: "end" });
+      // Change Highlights
+      contentArea.addEventListener("input", () => {
+        contentArea.style.backgroundColor = "#f0f8ff";
+        setTimeout(() => (contentArea.style.backgroundColor = "white"), 1000);
       });
 
-      // Function to draw real-time on canvas
-      const drawRealTime = (data) => {
-        data.forEach((point) => {
-          if (point.action === "start") {
-            ctx.beginPath();
-            ctx.moveTo(point.x, point.y);
-          } else if (point.action === "draw") {
-            ctx.lineTo(point.x, point.y);
-            ctx.stroke();
-          } else if (point.action === "end") {
-            ctx.closePath();
-          }
-        });
+      // Add new messages
+      function addMessage(text) {
+        const newMessageRef = push(ref(db, "messages"));
+        set(newMessageRef, { text });
+      }
+
+      // Listen for new messages
+      onValue(ref(db, "messages"), (snapshot) => {
+        const messages = snapshot.val();
+        messagesList.innerHTML = ""; // Clear old messages
+        if (messages) {
+          Object.keys(messages).forEach((key) => {
+            const message = messages[key];
+            const li = document.createElement("li");
+            li.innerHTML = `
+                        <span>${message.text}</span>
+                        <button onclick="downloadMessage('${message.text}')">Download</button>
+                        <button onclick="deleteMessage('${key}')">X</button>`;
+            li.dataset.key = key;
+            messagesList.appendChild(li);
+          });
+        }
+      });
+
+      // Download a message
+      window.downloadMessage = (text) => {
+        const blob = new Blob([text], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "message.txt";
+        a.click();
       };
 
-      // Clear the chalkboard
-      const clearButton = document.getElementById("clear-chalkboard");
-      clearButton.addEventListener("click", () => {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        sendDrawingData([{ action: "clear" }]);
+      // Delete a message
+      window.deleteMessage = (key) => {
+        remove(ref(db, `messages/${key}`));
+      };
+
+      // Enhanced Toolbar
+      toolbar.addEventListener("click", (event) => {
+        const action = event.target.dataset.action;
+        if (action) {
+          document.execCommand(action, false, null);
+        }
       });
     </script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+
+      .app-container {
+        display: flex;
+        flex: 1;
+      }
+
+      .editor {
+        flex: 3;
+        padding: 10px;
+        border-right: 1px solid #ccc;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .toolbar {
+        margin-bottom: 10px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .toolbar button {
+        padding: 5px 10px;
+        border: 1px solid #ccc;
+        background: #f9f9f9;
+        cursor: pointer;
+      }
+
+      .content-area {
+        flex: 1;
+        border: 1px solid #ccc;
+        padding: 10px;
+        overflow-y: auto;
+        background-color: #fff;
+      }
+
+      .sidebar {
+        flex: 1;
+        padding: 10px;
+        background: #f3f3f3;
+        overflow-y: auto;
+      }
+
+      .sidebar ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      .sidebar li {
+        padding: 10px;
+        margin-bottom: 10px;
+        background: #fff;
+        border: 1px solid #ccc;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .sidebar li button {
+        margin-left: 5px;
+      }
+
+      header {
+        background: #0078d7;
+        color: white;
+        padding: 10px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Real-Time Collaboration</h1>
+    </header>
+    <div class="app-container">
+      <div class="editor">
+        <div id="toolbar" class="toolbar">
+          <button data-action="bold">B</button>
+          <button data-action="italic">I</button>
+          <button data-action="underline">U</button>
+          <button data-action="backColor">Highlight</button>
+        </div>
+        <div id="content-area" contenteditable="true" class="content-area">
+          <!-- User input goes here -->
+        </div>
+      </div>
+      <div class="sidebar">
+        <ul id="messages">
+          <!-- Real-time messages go here -->
+        </ul>
+      </div>
+    </div>
   </body>
 </html>

@@ -3,25 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ID TipsHub</title>
+    <title>Messaging & Chalkboard</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <h1>ID TipsHub</h1>
-    <h2>Share Your Tip</h2>
+    <h1>Messaging & Chalkboard</h1>
 
-    <form id="tip-form">
-      <input type="text" id="author" placeholder="Your Name" required />
+    <!-- Messaging Section -->
+    <h2>Send a Message</h2>
+    <form id="message-form">
+      <input type="text" id="username" placeholder="Your Name" required />
       <textarea
-        id="content"
-        placeholder="Share your instructional design tip..."
+        id="message"
+        placeholder="Type your message here..."
         required
       ></textarea>
-      <button type="submit">Submit Tip</button>
+      <button type="submit">Send Message</button>
     </form>
 
-    <h2>Community Tips</h2>
-    <div id="tips-container"></div>
+    <h2>Chat Messages</h2>
+    <div id="messages-container"></div>
+
+    <!-- Chalkboard Section -->
+    <h2>Chalkboard</h2>
+    <canvas id="chalkboard" width="500" height="300"></canvas>
+    <button id="clear-chalkboard">Clear Chalkboard</button>
 
     <script type="module">
       // Import the functions you need from the SDKs
@@ -41,7 +47,7 @@
         apiKey: "AIzaSyANYoQSKphY_XAnilkdY-5R61iCC-aYukQ",
         authDomain: "id-tipshub.firebaseapp.com",
         projectId: "id-tipshub",
-        storageBucket: "id-tipshub.appspot.com", // Corrected storage bucket URL
+        storageBucket: "id-tipshub.appspot.com",
         messagingSenderId: "386076617554",
         appId: "1:386076617554:web:d5051dcbb01fb89446e88b",
         measurementId: "G-3TLPW3QLBM",
@@ -51,41 +57,44 @@
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
-      const form = document.getElementById("tip-form");
-      const tipsContainer = document.getElementById("tips-container");
+      const form = document.getElementById("message-form");
+      const messagesContainer = document.getElementById("messages-container");
 
-      // Submit a new tip
+      // Handle message submission
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const author = document.getElementById("author").value;
-        const content = document.getElementById("content").value;
+        const username = document.getElementById("username").value;
+        const message = document.getElementById("message").value;
 
         try {
-          await addDoc(collection(db, "tips"), {
-            author,
-            content,
+          await addDoc(collection(db, "messages"), {
+            username,
+            message,
             timestamp: serverTimestamp(),
           });
           form.reset();
-          loadTips();
+          loadMessages();
         } catch (error) {
-          console.error("Error adding tip: ", error);
+          console.error("Error sending message: ", error);
         }
       });
 
-      // Load and display tips
-      async function loadTips() {
-        tipsContainer.innerHTML = "";
-        const q = query(collection(db, "tips"), orderBy("timestamp", "desc"));
+      // Load and display messages
+      async function loadMessages() {
+        messagesContainer.innerHTML = "";
+        const q = query(
+          collection(db, "messages"),
+          orderBy("timestamp", "desc")
+        );
         const snapshot = await getDocs(q);
         snapshot.forEach((doc) => {
-          const tip = doc.data();
-          tipsContainer.innerHTML += `
-            <div class="tip">
-              <strong>${tip.author}</strong>
-              <p>${tip.content}</p>
+          const msg = doc.data();
+          messagesContainer.innerHTML += `
+            <div class="message">
+              <strong>${msg.username}</strong>
+              <p>${msg.message}</p>
               <small>${
-                tip.timestamp ? tip.timestamp.toDate().toLocaleString() : ""
+                msg.timestamp ? msg.timestamp.toDate().toLocaleString() : ""
               }</small>
             </div>
             <hr />
@@ -93,8 +102,100 @@
         });
       }
 
-      // Load tips on page load
-      loadTips();
+      // Load messages on page load
+      loadMessages();
+    </script>
+    <script type="module">
+      // Import Firebase SDK
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        addDoc,
+        onSnapshot,
+        doc,
+        setDoc,
+      } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+      // Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyANYoQSKphY_XAnilkdY-5R61iCC-aYukQ",
+        authDomain: "id-tipshub.firebaseapp.com",
+        projectId: "id-tipshub",
+        storageBucket: "id-tipshub.appspot.com",
+        messagingSenderId: "386076617554",
+        appId: "1:386076617554:web:d5051dcbb01fb89446e88b",
+        measurementId: "G-3TLPW3QLBM",
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Real-time drawing synchronization
+      let drawingRef = doc(db, "chalkboard", "drawing");
+
+      // Function to send drawing data to Firestore
+      const sendDrawingData = (data) => {
+        setDoc(drawingRef, { data: data });
+      };
+
+      // Listening for real-time updates from Firestore
+      onSnapshot(drawingRef, (docSnapshot) => {
+        const drawingData = docSnapshot.data().data;
+        drawRealTime(drawingData);
+      });
+
+      // Drawing Canvas setup
+      const canvas = document.getElementById("chalkboard");
+      const ctx = canvas.getContext("2d");
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "white";
+
+      let isDrawing = false;
+
+      // Event listeners for drawing
+      canvas.addEventListener("mousedown", (e) => {
+        isDrawing = true;
+        ctx.moveTo(e.offsetX, e.offsetY);
+        sendDrawingData({ x: e.offsetX, y: e.offsetY, action: "start" });
+      });
+
+      canvas.addEventListener("mousemove", (e) => {
+        if (isDrawing) {
+          ctx.lineTo(e.offsetX, e.offsetY);
+          ctx.stroke();
+          sendDrawingData({ x: e.offsetX, y: e.offsetY, action: "draw" });
+        }
+      });
+
+      canvas.addEventListener("mouseup", () => {
+        isDrawing = false;
+        sendDrawingData({ action: "end" });
+      });
+
+      // Function to draw real-time on canvas
+      const drawRealTime = (data) => {
+        data.forEach((point) => {
+          if (point.action === "start") {
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+          } else if (point.action === "draw") {
+            ctx.lineTo(point.x, point.y);
+            ctx.stroke();
+          } else if (point.action === "end") {
+            ctx.closePath();
+          }
+        });
+      };
+
+      // Clear the chalkboard
+      const clearButton = document.getElementById("clear-chalkboard");
+      clearButton.addEventListener("click", () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        sendDrawingData([{ action: "clear" }]);
+      });
     </script>
   </body>
 </html>
